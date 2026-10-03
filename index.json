@@ -202,10 +202,10 @@
     },
     {
       "id": "org.lux.strm-media-info",
-      "name": "strm媒体信息提取",
-      "description": "使用 ffprobe 提取媒体信息，并使用 ffmpeg 补全 STRM 缩略图。",
+      "name": "strm媒体信息提取（魔改版）",
+      "description": "使用 ffprobe 提取媒体信息，并使用 ffmpeg 补全 STRM 缩略图。魔改：① 可把 mediainfo.json 集中输出到自定义目录；② 新增媒体信息恢复模式，集中目录已有 json 时直接复用、跳过远程提取。",
       "category": "MEDIA",
-      "version": "0.3.0",
+      "version": "4.0.0",
       "runtime": "process",
       "providerKey": null,
       "aliases": [],
@@ -216,8 +216,8 @@
         {
           "platform": "linux",
           "arch": "x86_64",
-          "url": "https://github.com/USBVillage/Lux-plugins/releases/download/org.lux.strm-media-info/org.lux.strm-media-info-0.3.0-linux-x86_64.zip",
-          "sha256": "313e47192cb61afbe298a9c350a8512e22fd24ef5b9e8480a33fbe31477b27ca"
+          "url": "https://github.com/USBVillage/Lux-plugins/releases/download/org.lux.strm-media-info/org.lux.strm-media-info-4.0.0-linux-x86_64.zip",
+          "sha256": "0a12928a6d3d91bf4f1f05af1f5873bd7307fd6197a32ae41277fbaae229ae93"
         }
       ]
     },

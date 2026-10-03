@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "id": "org.lux.strm-media-info",
-  "name": "strm媒体信息提取",
-  "description": "使用 ffprobe 提取媒体信息，并使用 ffmpeg 补全 STRM 缩略图。",
+  "name": "strm媒体信息提取（魔改版）",
+  "description": "使用 ffprobe 提取媒体信息，并使用 ffmpeg 补全 STRM 缩略图。魔改：① 可把 mediainfo.json 集中输出到自定义目录；② 新增媒体信息恢复模式，集中目录已有 json 时直接复用、跳过远程提取。",
   "version": "__VERSION__",
   "apiVersion": 1,
   "runtime": {"kind": "process", "entrypoint": "__ENTRYPOINT__"},
