@@ -205,7 +205,7 @@
       "name": "strm媒体信息提取（魔改版）",
       "description": "使用 ffprobe 提取媒体信息，并使用 ffmpeg 补全 STRM 缩略图。魔改：① 可把 mediainfo.json 集中输出到自定义目录；② 新增媒体信息恢复模式，集中目录已有 json 时直接复用、跳过远程提取；③ 自动给 Lux 前端补上「集中存放目录 / 路径前缀剥离 / 复用已有媒体信息」三个输入项（Lux 前端只渲染它硬编码认识的字段，故需就地补丁）。",
       "category": "MEDIA",
-      "version": "4.1.1",
+      "version": "4.2.0",
       "runtime": "process",
       "providerKey": null,
       "aliases": [],
@@ -215,9 +215,15 @@
       "packages": [
         {
           "platform": "linux",
+          "arch": "aarch64",
+          "url": "https://github.com/USBVillage/USBVillage-Plugins/releases/download/org.lux.strm-media-info/org.lux.strm-media-info-4.2.0-linux-aarch64.zip",
+          "sha256": "53b14c8a9f790c9ba80701acac3dd60e521c410fa63baf22080938795fe16731"
+        },
+        {
+          "platform": "linux",
           "arch": "x86_64",
-          "url": "https://github.com/USBVillage/USBVillage-Plugins/releases/download/org.lux.strm-media-info/org.lux.strm-media-info-4.1.1-linux-x86_64.zip",
-          "sha256": "229b436cfb69f716fc9570b0d7273653ab5525a9d5618b5350184e7243ff55b8"
+          "url": "https://github.com/USBVillage/USBVillage-Plugins/releases/download/org.lux.strm-media-info/org.lux.strm-media-info-4.2.0-linux-x86_64.zip",
+          "sha256": "e92fd4a81f8565786becd566a83124d83125673d9985a8ff10fe226a4b1ceeff"
         }
       ]
     },
