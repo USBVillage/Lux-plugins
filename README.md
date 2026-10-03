@@ -1,4 +1,17 @@
-# Lux Plugins
+# Lux Plugins Mod
+
+> **本仓库是 USBVillage 自建的 Lux 插件目录**（原仓库名 `Lux-plugins`，于 2026-10-03 更名为
+> `Lux-plugins-mod`，改名后 GitHub 会保留旧地址的重定向）。
+>
+> - 内容 = Lux 官方插件目录 + **魔改版 `org.lux.strm-media-info`**
+>   （额外支持「集中存放目录」「路径前缀剥离」「复用已有媒体信息」，并会在插件进程启动时自动给
+>   Lux 前端分片 `assets/AdminPluginsPage.js` 打补丁，让这三项真正显示在配置弹窗里）。
+> - **与 `USBVillage/Lux-plugins-plus` 是两个互相独立的项目**，发布时不要互相覆盖。
+>   后者是 TMDb 元数据增强（`org.lux.tmdb-plus`）的独立目录。
+> - Lux 的「插件商店地址」同时只能填一个，见下方「插件商店地址」一节。
+>
+> 本仓库的 GitHub Actions 已被关闭，发布走本地 `tools/publish_to_github.py`（手动生成
+> `index.json` + 上传 Release 资产）。
 
 This repository is the default plugin store for [Lux](https://github.com/Qoo-330ml/Lux).
 
@@ -83,3 +96,27 @@ selects the outer Lux-native or limited Emby-style transport shape; it does not 
 rewrite notification text. The target URL may reference Lux-generated fields with URL encoding.
 Delivery queues, retry scheduling and secret storage remain owned by Lux, so this plugin has no
 access to the Lux configuration directory or database.
+
+## 插件商店地址（重要）
+
+Lux **只支持一个**商店地址，存在 `{LUX_CONFIG_DIR}/plugin_store_url` 单个文件里，同时在
+管理界面「插件商店」页可以改（`GET/PUT /api/v1/admin/plugin-store`）。
+
+地址格式规则（源码 `src/application/plugin_store.rs::catalog_url`）：
+
+- `https://github.com/<owner>/<repo>`（**正好两段路径**）→ 自动改写为
+  `https://raw.githubusercontent.com/<owner>/<repo>/main/index.json`。**这是推荐写法。**
+- 带多余路径（例如 `/releases/tag/xxx`）或非 GitHub 的地址 → **原样去拉**，拉回来必须是
+  Lux 目录 JSON，否则解析失败、商店目录为空（表现为插件的 `latestVersion` 为 `null`、
+  永不提示更新）。所以**不要**把 GitHub Release 页面地址填进去。
+
+| 用途 | 商店地址 |
+| --- | --- |
+| 本仓库（官方插件 + 魔改 strm） | `https://github.com/USBVillage/Lux-plugins-mod` |
+| TMDb 增强（独立项目） | `https://github.com/USBVillage/Lux-plugins-plus` |
+| Lux 官方默认 | `https://github.com/Qoo-330ml/Lux-plugins` |
+
+两个自建仓库**不能同时生效**——`Lux-plugins-mod` 里已包含官方全部插件，日常挂在它上面即可；
+要更新 `tmdb-plus` 时把商店地址临时切到 `Lux-plugins-plus`，装完再切回来。
+切换只是改配置，不会卸载已装插件，也不会丢插件配置。
+
