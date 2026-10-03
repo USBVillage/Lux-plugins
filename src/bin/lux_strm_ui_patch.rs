@@ -38,8 +38,9 @@ pub fn ensure_patched() -> String {
     };
 
     if source.contains(MARKER) {
-        // 已经是补丁版，什么都不用做，也不需要反复写状态文件。
-        return "OK 已是最新（marker 已存在）".to_owned();
+        // 已经是补丁版。这里仍然过一遍 report，用来把上一次并发竞争留下的
+        // 误导性状态（例如 "FAIL ... No such file"）自我纠正。
+        return report(&web_dir, "OK 已是最新（marker 已存在，无需处理）");
     }
 
     for (index, (anchor, _)) in REPLACEMENTS.iter().enumerate() {
@@ -71,16 +72,23 @@ pub fn ensure_patched() -> String {
         None => "（备份失败，仅内存中留有原文件）".to_owned(),
     };
 
-    // 同目录写临时文件再 rename，避免 Lux 正在读时读到半个文件。
-    let temp = asset.with_file_name("AdminPluginsPage.js.luxpatch");
+    // 关键：临时文件名必须带上 pid。
+    // Lux 是按单个探测目标起独立进程的（concurrency=2 时会有两个插件进程同时启动），
+    // 如果共用一个临时文件名，A 进程 rename 掉的可能是 B 进程正在写一半的文件，
+    // 从而把半截 JS 换到线上。用 pid 隔离后再 rename，才真正原子。
+    let temp = asset.with_file_name(format!("AdminPluginsPage.js.luxpatch.{}", std::process::id()));
     if let Err(error) = std::fs::write(&temp, patched.as_bytes()) {
         return report(
             &web_dir,
-            &format!("FAIL 写临时文件失败（目录可能只读）：{error}"),
+            &format!("FAIL 写临时文件失败（web 目录可能只读）：{error}"),
         );
     }
     if let Err(error) = std::fs::rename(&temp, &asset) {
         let _ = std::fs::remove_file(&temp);
+        // 竞争兜底：可能另一个进程已经补好了。
+        if std::fs::read_to_string(&asset).is_ok_and(|text| text.contains(MARKER)) {
+            return report(&web_dir, "OK 已是最新（另一个插件进程已完成补丁）");
+        }
         return report(
             &web_dir,
             &format!("FAIL 替换 {} 失败：{error}", asset.display()),
@@ -132,16 +140,22 @@ fn backup_original(source: &str) -> Option<PathBuf> {
     Some(path)
 }
 
-/// 把结果写到 web 目录和 config 目录，方便外部核对。
+/// 把结果写到 web 目录和 config 目录，方便外部核对（内容一致就不重复落盘）。
 fn report(web_dir: &Path, message: &str) -> String {
     let line = format!("{message}\n");
-    let assets = web_dir.join("assets");
-    let _ = std::fs::write(assets.join(STATUS_NAME), line.as_bytes());
+    write_if_changed(&web_dir.join("assets").join(STATUS_NAME), &line);
     if let Some(config_dir) = std::env::var_os("LUX_CONFIG_DIR") {
-        let _ = std::fs::write(
-            Path::new(&config_dir).join("lux-strm-ui-patch.status"),
-            line.as_bytes(),
+        write_if_changed(
+            &Path::new(&config_dir).join("lux-strm-ui-patch.status"),
+            &line,
         );
     }
     message.to_owned()
+}
+
+fn write_if_changed(path: &Path, content: &str) {
+    if std::fs::read_to_string(path).is_ok_and(|current| current == content) {
+        return;
+    }
+    let _ = std::fs::write(path, content.as_bytes());
 }
