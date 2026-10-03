@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
-  "name": "Lux Plugins",
-  "description": "Lux 官方插件目录",
+  "name": "Lux Plugins Mod",
+  "description": "USBVillage 自建插件目录：官方插件 + 魔改版 strm 媒体信息提取（额外支持集中存放目录、路径前缀剥离、复用已有媒体信息）。与 Lux-plugins-plus（TMDb 增强）为两个独立项目。",
   "plugins": [
     {
       "id": "org.lux.danmaku",
@@ -216,7 +216,7 @@
         {
           "platform": "linux",
           "arch": "x86_64",
-          "url": "https://github.com/USBVillage/Lux-plugins/releases/download/org.lux.strm-media-info/org.lux.strm-media-info-4.1.1-linux-x86_64.zip",
+          "url": "https://github.com/USBVillage/Lux-plugins-mod/releases/download/org.lux.strm-media-info/org.lux.strm-media-info-4.1.1-linux-x86_64.zip",
           "sha256": "229b436cfb69f716fc9570b0d7273653ab5525a9d5618b5350184e7243ff55b8"
         }
       ]
