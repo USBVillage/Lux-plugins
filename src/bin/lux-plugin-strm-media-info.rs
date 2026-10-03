@@ -238,10 +238,16 @@ async fn probe(params: Value) -> Result<Value, PluginRpcError> {
         && let Some(result) = parse_media_info_sidecar(&bytes)
     {
         let thumbnail = if request.include_thumbnail {
-            let duration_ticks = result.duration_ticks.ok_or_else(duration_error)?;
-            let timestamp =
-                thumbnail_timestamp(duration_ticks, request.thumbnail_position_percent)
-                    .ok_or_else(duration_error)?;
+            // sidecar 缺 RunTimeTicks 时只回退 ffprobe 取时长，不让整个复用探测失败。
+            let duration_ticks = match result.duration_ticks {
+                Some(duration_ticks) => Some(duration_ticks),
+                None => Some(run_ffprobe_duration(&request.url).await?),
+            };
+            let timestamp = thumbnail_timestamp(
+                duration_ticks.ok_or_else(duration_error)?,
+                request.thumbnail_position_percent,
+            )
+            .ok_or_else(duration_error)?;
             Some(run_ffmpeg_thumbnail(&request.url, &timestamp).await?)
         } else {
             None

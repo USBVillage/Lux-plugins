@@ -7,7 +7,7 @@ set -euo pipefail
 
 PLUGIN_ID="org.lux.strm-media-info"
 PLUGIN_BIN="lux-plugin-strm-media-info"
-VERSION="4.1.1"
+VERSION="4.2.0"
 ARCH="${1:-x86_64}"
 
 case "$ARCH" in
