@@ -1,0 +1,94 @@
+name: Validate login background plugin
+
+on:
+  push:
+    paths:
+      - ".github/workflows/login-background-validation.yml"
+      - "plugins.json"
+      - "manifests/org.lux.login-background.json"
+      - "src/application/plugin_protocol.rs"
+      - "src/application/tmdb.rs"
+      - "src/bin/lux-plugin-login-background.rs"
+      - "tests/fixtures/login-background/tmdb-trending-day-v1.json"
+      - "tests/fixtures/login-background/single-poster-v1.json"
+      - "tests/fixtures/login-background/single-image-v1.json"
+      - "tests/login_background_contract.rs"
+      - "tests/login_background_unified.rs"
+      - "tests/test_login_background_contract.py"
+      - "tests/test_release_workflow.py"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Build ${{ matrix.arch }} plugin package
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out plugin sources
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Test the login background SDK and provider
+        run: cargo test --locked --bin lux-plugin-login-background --test login_background_contract --test login_background_unified
+      - name: Test redirect behavior in the shared TMDb client
+        run: cargo test --locked --lib application::tmdb::tests
+      - name: Validate login background fixtures and catalog
+        run: python3 -m unittest discover -s tests -p test_login_background_contract.py
+      - name: Lint the providers
+        run: cargo clippy --locked --bin lux-plugin-login-background --all-features -- -D warnings
+      - name: Build the Linux providers
+        run: cargo build --release --locked --target "${{ matrix.target }}" --bin lux-plugin-login-background
+      - name: Package the providers without publishing them
+        run: |
+          python3 scripts/package_plugin.py \
+            --id org.lux.login-background \
+            --version 0.1.1 \
+            --manifest manifests/org.lux.login-background.json \
+            --binary "target/${{ matrix.target }}/release/lux-plugin-login-background" \
+            --platform linux \
+            --arch "${{ matrix.arch }}" \
+            --output "artifacts/org.lux.login-background-0.1.1-linux-${{ matrix.arch }}.zip"
+      - name: Verify package manifest and checksums
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          for plugin_id, version in (
+              ("org.lux.login-background", "0.1.1"),
+          ):
+              package = Path(f"artifacts/{plugin_id}-{version}-linux-${{ matrix.arch }}.zip")
+              with ZipFile(package) as archive:
+                  manifest = json.loads(archive.read("manifest.json"))
+                  entrypoint = manifest["runtime"]["entrypoint"]
+                  binary = archive.read(entrypoint)
+              assert manifest["id"] == plugin_id
+              assert manifest["version"] == version
+              assert manifest["type"] == "login_background"
+              assert manifest["capabilities"] == ["login_background.get"]
+              assert manifest["files"] == [{"path": entrypoint, "sha256": hashlib.sha256(binary).hexdigest()}]
+              print(f"{package}: sha256={hashlib.sha256(package.read_bytes()).hexdigest()}")
+          PY
+      - name: Upload validation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-background-providers-${{ matrix.arch }}
+          path: artifacts/*.zip
+          if-no-files-found: error
