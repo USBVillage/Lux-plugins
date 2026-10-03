@@ -1,7 +1,7 @@
 # Lux Plugins Mod
 
-> **本仓库是 USBVillage 自建的 Lux 插件目录**（原仓库名 `Lux-plugins`，于 2026-10-03 更名为
-> `Lux-plugins-mod`，改名后 GitHub 会保留旧地址的重定向）。
+> **本仓库是 USBVillage 自建的 Lux 插件目录**（原名 `Lux-plugins`，2026-10-03 更名为
+> `USBVillage-Plugins`；GitHub 会保留旧地址的重定向，repo id 不变）。
 >
 > - 内容 = Lux 官方插件目录 + **魔改版 `org.lux.strm-media-info`**
 >   （额外支持「集中存放目录」「路径前缀剥离」「复用已有媒体信息」，并会在插件进程启动时自动给
@@ -112,11 +112,11 @@ Lux **只支持一个**商店地址，存在 `{LUX_CONFIG_DIR}/plugin_store_url`
 
 | 用途 | 商店地址 |
 | --- | --- |
-| 本仓库（官方插件 + 魔改 strm） | `https://github.com/USBVillage/Lux-plugins-mod` |
+| 本仓库（官方插件 + 魔改 strm） | `https://github.com/USBVillage/USBVillage-Plugins` |
 | TMDb 增强（独立项目） | `https://github.com/USBVillage/Lux-plugins-plus` |
 | Lux 官方默认 | `https://github.com/Qoo-330ml/Lux-plugins` |
 
-两个自建仓库**不能同时生效**——`Lux-plugins-mod` 里已包含官方全部插件，日常挂在它上面即可；
+两个自建仓库**不能同时生效**——`USBVillage-Plugins` 里已包含官方全部插件，日常挂在它上面即可；
 要更新 `tmdb-plus` 时把商店地址临时切到 `Lux-plugins-plus`，装完再切回来。
 切换只是改配置，不会卸载已装插件，也不会丢插件配置。
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 在 Linux 上编译「魔改版」org.lux.strm-media-info 并打包成 Lux 可安装的 zip。
 #
-# 用法（在 lux-plugins-mod 目录下）：
+# 用法（在 USBVillage-Plugins 目录下）：
 #   bash scripts/build-custom-plugin.sh [x86_64|aarch64]
 set -euo pipefail
 
