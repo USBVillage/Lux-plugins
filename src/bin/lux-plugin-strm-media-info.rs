@@ -25,6 +25,9 @@ use tokio::{
 
 const PLUGIN_ID: &str = "org.lux.strm-media-info";
 const PLUGIN_NAME: &str = "strm媒体信息提取";
+
+/// 魔改：负责把「插件自定义配置项」补进 Lux 自己的前端分片。
+mod lux_strm_ui_patch;
 const FFPROBE_TIMEOUT: Duration = Duration::from_secs(30);
 const FFMPEG_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_OUTPUT_BYTES: usize = 4 * 1024 * 1024;
@@ -55,6 +58,13 @@ fn default_thumbnail_position_percent() -> i64 {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // 每个插件进程启动时尝试一次；失败只影响「网页里能否看到自定义配置项」，
+    // 不会影响 STRM 探测本身。结果写到 web 目录下的 lux-strm-ui-patch.status。
+    eprintln!(
+        "[lux-strm-media-info] 前端自定义配置项补丁：{}",
+        lux_strm_ui_patch::ensure_patched()
+    );
+
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
     let mut lines = BufReader::new(stdin).lines();
