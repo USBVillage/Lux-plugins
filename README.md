@@ -97,6 +97,26 @@ rewrite notification text. The target URL may reference Lux-generated fields wit
 Delivery queues, retry scheduling and secret storage remain owned by Lux, so this plugin has no
 access to the Lux configuration directory or database.
 
+## 前端补丁持久化（容器启动自动恢复）
+
+Lux 的 web 资源在容器层里，容器重建（`compose up -d` / 升级镜像）会把前端补丁还原，
+配置弹窗里魔改的三个字段随之消失，直到插件进程下一次启动重新打补丁。
+4.3.0 起，插件打补丁成功后会把「补丁版 + 原版」副本持久化到 `{LUX_CONFIG_DIR}/web-patch/`；
+在 compose 里给 lux 服务加一行启动命令，即可在每次容器启动时自动恢复补丁：
+
+```yaml
+    command:
+      - /bin/sh
+      - -c
+      - cmp -s /usr/local/share/lux/web/assets/AdminPluginsPage.js /config/web-patch/AdminPluginsPage.stock.js && cp /config/web-patch/AdminPluginsPage.patched.js /usr/local/share/lux/web/assets/AdminPluginsPage.js; exec /usr/local/bin/luxd
+```
+
+启动脚本先 `cmp` 校验当前 web 分片与保存的原版一致（= Lux 版本没变）才覆盖；
+升级 Lux 后校验自然失败、自动跳过，绝不会把旧前端套到新后端上，等插件下一次
+进程启动（实时探测 / 定时任务 / 手动运行）重新打补丁即可。副本缺失（首次安装、
+或从 4.2.0 及更早版本升级）时先手动跑一次探测任务生成。补丁结果随时可查：
+`/assets/lux-strm-ui-patch.status`。
+
 ## 插件商店地址（重要）
 
 Lux **只支持一个**商店地址，存在 `{LUX_CONFIG_DIR}/plugin_store_url` 单个文件里，同时在

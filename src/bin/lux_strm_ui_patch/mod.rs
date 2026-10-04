@@ -8,6 +8,14 @@
 //! 锚点不唯一就跳过绝不乱改），并把结果写到 assets 目录下的状态文件里，
 //! 这样可以直接用浏览器/curl 读取 `…/assets/lux-strm-ui-patch.status` 查看结果。
 //!
+//! 持久化：打补丁成功后会把「补丁版 + 原版」副本写进 `{LUX_CONFIG_DIR}/web-patch/`。
+//! web 目录在容器层里，容器重建就还原；把下面这行加进 compose 的 `command` 即可
+//! 在每次容器启动时自动恢复（版本校验失败会自动跳过，升级 Lux 也不会错配）：
+//!   sh -c 'cmp -s /usr/local/share/lux/web/assets/AdminPluginsPage.js
+//!          /config/web-patch/AdminPluginsPage.stock.js
+//!          && cp /config/web-patch/AdminPluginsPage.patched.js
+//!          /usr/local/share/lux/web/assets/AdminPluginsPage.js; exec /usr/local/bin/luxd'
+//!
 //! 补丁内容由 `tools/patch_lux_ui.py --emit-rust` 生成，见 `lux_strm_ui_patch_data.rs`。
 
 include!("lux_strm_ui_patch_data.rs");
@@ -19,6 +27,15 @@ const STATUS_NAME: &str = "lux-strm-ui-patch.status";
 
 /// 前端分片相对 web 根的路径。
 const ASSET_REL: &str = "assets/AdminPluginsPage.js";
+
+/// 持久化副本目录（config 卷，容器重建不丢）。配合容器启动脚本：
+/// 先 cmp 校验 Lux 版本未变（当前 web 文件 == stock 副本），再把 patched 副本
+/// 覆盖回 web 目录。升级 Lux 后校验自然失败，绝不把旧前端套到新后端上。
+const WEB_PATCH_DIR: &str = "web-patch";
+/// 持久化的补丁版分片。
+const PATCHED_NAME: &str = "AdminPluginsPage.patched.js";
+/// 持久化的原版分片（打补丁那一刻的 web 文件，用于版本校验）。
+const STOCK_NAME: &str = "AdminPluginsPage.stock.js";
 
 /// 入口：幂等打补丁。任何失败都只返回说明字符串，绝不影响插件本体功能。
 pub fn ensure_patched() -> String {
@@ -40,7 +57,11 @@ pub fn ensure_patched() -> String {
     if source.contains(MARKER) {
         // 已经是补丁版。这里仍然过一遍 report，用来把上一次并发竞争留下的
         // 误导性状态（例如 "FAIL ... No such file"）自我纠正。
-        return report(&web_dir, "OK 已是最新（marker 已存在，无需处理）");
+        let note = ensure_persisted_from_existing(&source);
+        return report(
+            &web_dir,
+            &format!("OK 已是最新（marker 已存在，无需处理）{note}"),
+        );
     }
 
     for (index, (anchor, _)) in REPLACEMENTS.iter().enumerate() {
@@ -86,8 +107,13 @@ pub fn ensure_patched() -> String {
     if let Err(error) = std::fs::rename(&temp, &asset) {
         let _ = std::fs::remove_file(&temp);
         // 竞争兜底：可能另一个进程已经补好了。
-        if std::fs::read_to_string(&asset).is_ok_and(|text| text.contains(MARKER)) {
-            return report(&web_dir, "OK 已是最新（另一个插件进程已完成补丁）");
+        let raced = std::fs::read_to_string(&asset).ok().filter(|text| text.contains(MARKER));
+        if let Some(current) = raced {
+            let note = ensure_persisted_from_existing(&current);
+            return report(
+                &web_dir,
+                &format!("OK 已是最新（另一个插件进程已完成补丁）{note}"),
+            );
         }
         return report(
             &web_dir,
@@ -95,10 +121,11 @@ pub fn ensure_patched() -> String {
         );
     }
 
+    let persist_note = persist_copies(&source, &patched);
     report(
         &web_dir,
         &format!(
-            "OK 已打补丁：{} 处替换，{} -> {} 字节{backup_note}；请硬刷新（Ctrl+F5）网页",
+            "OK 已打补丁：{} 处替换，{} -> {} 字节{backup_note}{persist_note}；请硬刷新（Ctrl+F5）网页",
             REPLACEMENTS.len(),
             source.len(),
             patched.len()
@@ -138,6 +165,53 @@ fn backup_original(source: &str) -> Option<PathBuf> {
         std::fs::write(&path, source.as_bytes()).ok()?;
     }
     Some(path)
+}
+
+/// 打补丁成功后把「补丁版 + 原版」副本写进 config 卷（容器重建不丢），
+/// 供容器启动脚本恢复补丁。写入失败只影响自动恢复，不影响本次补丁。
+fn persist_copies(source: &str, patched: &str) -> String {
+    let Some(dir) = web_patch_dir() else {
+        return String::new();
+    };
+    let _ = std::fs::create_dir_all(&dir);
+    let patched_ok = std::fs::write(dir.join(PATCHED_NAME), patched.as_bytes()).is_ok();
+    let stock_ok = std::fs::write(dir.join(STOCK_NAME), source.as_bytes()).is_ok();
+    match (patched_ok, stock_ok) {
+        (true, true) => "；已持久化补丁副本到 config/web-patch/（配合容器启动自动恢复）".to_owned(),
+        _ => "；持久化补丁副本写入失败".to_owned(),
+    }
+}
+
+/// web 文件已经是补丁版但持久化副本缺失时（例如升级插件前就打过补丁），
+/// 用当前 web 文件和 web-ui-backup 里的原版重建副本。
+fn ensure_persisted_from_existing(patched_source: &str) -> String {
+    let Some(dir) = web_patch_dir() else {
+        return String::new();
+    };
+    if dir.join(PATCHED_NAME).is_file() && dir.join(STOCK_NAME).is_file() {
+        return String::new();
+    }
+    let stock = dir
+        .parent()
+        .map(|config_dir| config_dir.join("web-ui-backup").join("AdminPluginsPage.original.js"));
+    let stock_source = match stock {
+        Some(path) => std::fs::read_to_string(path).ok().filter(|text| !text.contains(MARKER)),
+        None => None,
+    };
+    let Some(stock_source) = stock_source else {
+        return "；持久化副本不完整（缺干净的原版备份）".to_owned();
+    };
+    let _ = std::fs::create_dir_all(&dir);
+    let patched_ok = std::fs::write(dir.join(PATCHED_NAME), patched_source.as_bytes()).is_ok();
+    let stock_ok = std::fs::write(dir.join(STOCK_NAME), stock_source.as_bytes()).is_ok();
+    match (patched_ok, stock_ok) {
+        (true, true) => "；持久化副本已生成到 config/web-patch/".to_owned(),
+        _ => "；持久化副本写入失败".to_owned(),
+    }
+}
+
+fn web_patch_dir() -> Option<PathBuf> {
+    std::env::var_os("LUX_CONFIG_DIR").map(|config_dir| Path::new(&config_dir).join(WEB_PATCH_DIR))
 }
 
 /// 把结果写到 web 目录和 config 目录，方便外部核对（内容一致就不重复落盘）。
